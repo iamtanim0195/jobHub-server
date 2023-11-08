@@ -35,7 +35,12 @@ async function run() {
             res.send(result);
         });
 
-        
+        app.post('/api/user/add-job', async (req, res) => {
+            const addJob = req.body;
+            const result = await addJobCollection.insertOne(addJob);
+        });
+
+       
 
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
