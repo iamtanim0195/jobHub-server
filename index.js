@@ -1,11 +1,15 @@
 const express = require('express');
-const app = express();
 const port = 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+var jwt = require('jsonwebtoken');
 require('dotenv').config();
-//parsers
+const app = express();
 
+//parsers
 app.use(express.json());
+
+
+const secret = process.env.JWT_SECRET;
 
 const uri = `mongodb+srv://${process.env.DB_USER
     }:${process.env.DB_PASS
@@ -40,13 +44,23 @@ async function run() {
             const result = await addJobCollection.insertOne(addJob);
         });
 
-        app.delete('api/user/delete-job/:add-job-id', async (req, res)=>{
-            const id = req.params.add-job-id
-            const query = {_id: new ObjectId(id)}
+        app.delete('api/user/delete-job/:add-job-id', async (req, res) => {
+            const id = req.params.add - job - id
+            const query = { _id: new ObjectId(id) }
             const result = await addJobCollection.deleteOne(query);
             res.send(result);
         })
-
+        //! authenticated jwt
+        app.post('/api/auth/jwt', async (req, res) => {
+            //creating token and send to client
+            const user = req.body
+            const token = jwt.sign(user, secret);
+            res.cookie('token', {
+                httpOnly: true,
+                security: true,
+                sameSite: 'none',
+            }).send({ success: true });
+        });
         // Send a ping to confirm a successful connection
         await client.db("admin").command({ ping: 1 });
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
