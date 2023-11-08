@@ -2,11 +2,21 @@ const express = require('express');
 const port = 5000;
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 var jwt = require('jsonwebtoken');
+var cookieParser = require('cookie-parser');
+var cors = require('cors');
 require('dotenv').config();
 const app = express();
 
 //parsers
+app.use(cors({
+    origin: [
+        'http://localhost:5173',
+    ],
+    credentials: true
+}));
 app.use(express.json());
+app.use(cookieParser());
+
 
 
 const secret = process.env.JWT_SECRET;
@@ -31,6 +41,27 @@ async function run() {
         //! Connect to collection
         const db = client.db("pro-11");
         const jovCollection = db.collection("jobs");
+        const addJobCollection = db.collection("addJobs");
+
+        //! middlewares
+        // verify token  and grant access to
+        const gateman = (req, res, next) => {
+            const { token } = req.cookies
+            //if client does not send token
+            if (!token) {
+                return res.status(401).send({ message: 'you are not authorized ' })
+            }
+            // verify a token symmetric
+            jwt.verify(token, secret, (err, decoded) => {
+                if (err) {
+                    return res.status(401).send({ message: 'you are not authorized ' })
+                }
+                //attached decoded user so that others can get it
+                req.user = decoded;
+                next();
+            })
+
+        };
 
         //!curd
         app.get('/api/jobs', async (req, res) => {
@@ -43,6 +74,25 @@ async function run() {
             const addJob = req.body;
             const result = await addJobCollection.insertOne(addJob);
         });
+        //user specific add a job
+
+        app.get('/api/user/job', gateman, async (req, res) => {
+            const queryEmail = req.query.email;
+            const tokenEmail = req.user.email;
+            if (queryEmail !== tokenEmail) {
+                return res.status(403).send({ message: 'forbidden access' });
+            }
+            //match user email to check it is a valid user
+            let query = {}
+
+            if (queryEmail) {
+                query.email = queryEmail;
+            }
+
+            const result = await addJobCollection.findOne(query).toArray()
+            res.send(result);
+
+        });
 
         app.delete('api/user/delete-job/:add-job-id', async (req, res) => {
             const id = req.params.add - job - id
@@ -51,13 +101,13 @@ async function run() {
             res.send(result);
         })
         //! authenticated jwt
-        app.post('/api/auth/jwt', async (req, res) => {
+        app.post('/api/auth/jwt', (req, res) => {
             //creating token and send to client
             const user = req.body
-            const token = jwt.sign(user, secret);
-            res.cookie('token', {
+            const token = jwt.sign(user, secret, { expiresIn: 60 * 60 });
+            res.cookie('token', token, {
                 httpOnly: true,
-                security: true,
+                security: false,
                 sameSite: 'none',
             }).send({ success: true });
         });
